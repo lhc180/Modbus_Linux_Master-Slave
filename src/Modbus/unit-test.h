@@ -22,7 +22,7 @@
 # endif
 #endif
 
-#define SERVER_ID         17
+#define SERVER_ID         1
 #define INVALID_SERVER_ID 18
 
 const uint16_t UT_BITS_ADDRESS = 0x130;
@@ -33,7 +33,8 @@ const uint16_t UT_INPUT_BITS_ADDRESS = 0x1C4;
 const uint16_t UT_INPUT_BITS_NB = 0x16;
 const uint8_t UT_INPUT_BITS_TAB[] = { 0xAC, 0xDB, 0x35 };
 
-const uint16_t UT_REGISTERS_ADDRESS = 0x160;
+const uint16_t UT_REGISTERS_ADDRESS = 0x5A;
+//const uint16_t UT_REGISTERS_ADDRESS = 0x160;
 const uint16_t UT_REGISTERS_NB = 0x3;
 const uint16_t UT_REGISTERS_NB_MAX = 0x20;
 const uint16_t UT_REGISTERS_TAB[] = { 0x022B, 0x0001, 0x0064 };
