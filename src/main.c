@@ -40,6 +40,7 @@ int main(int argc, char* argv[])
     int socketNum = -1;                 //使用网络连接时，建立连接成功后返回的套接字
     int ret;                            //返回值
     int headerLength;                   //接收到数据的头长度
+    uint8_t i = 0;
 
 
     /* 根据所传的参数决定使用哪种方式 */
@@ -89,8 +90,12 @@ int main(int argc, char* argv[])
     }
 
     /* 给比特位和寄存器赋初始值 */
+    modbus_set_bits_from_bytes(modbusMapping->tab_bits, 0, UT_BITS_NB, UT_BITS_TAB);
     modbus_set_bits_from_bytes(modbusMapping->tab_input_bits, 0, UT_INPUT_BITS_NB, UT_INPUT_BITS_TAB);
-    for (uint8_t i = 0; i < UT_INPUT_REGISTERS_NB; i++) {
+    for (i = 0; i < UT_REGISTERS_NB; i++) {
+        modbusMapping->tab_registers[i] = UT_REGISTERS_TAB[i];
+    }
+    for (i = 0; i < UT_INPUT_REGISTERS_NB; i++) {
         modbusMapping->tab_input_registers[i] = UT_INPUT_REGISTERS_TAB[i];
     }
 

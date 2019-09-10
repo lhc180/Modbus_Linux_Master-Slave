@@ -22,7 +22,7 @@
 # endif
 #endif
 
-#define SERVER_ID         17
+#define SERVER_ID         1
 #define INVALID_SERVER_ID 18
 
 // const uint16_t UT_BITS_ADDRESS = 0x130;
