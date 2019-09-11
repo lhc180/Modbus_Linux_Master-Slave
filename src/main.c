@@ -179,16 +179,20 @@ int main(int argc, char* argv[])
 #else 		//client主机
 
 #define BUG_REPORT(_cond, _format, _args ...) \
-    printf("\nLine %d: assertion error for '%s': " _format "\n", __LINE__, # _cond, ## _args)
+    printf("\nLine %d: assertion error for '%s': " _format "\n", __LINE__, # _cond, ## _args);
 
 #define ASSERT_TRUE(_cond, _format, __args...) {  \
-    if (_cond) {                                  \
-        printf("OK\n");                           \
-    } else {                                      \
-        BUG_REPORT(_cond, _format, ## __args);    \
-        goto close;                               \
-    }                                             \
-};
+            if (_cond) {                                  \
+                printf("OK\n");                           \
+            } else {                                      \
+                BUG_REPORT(_cond, _format, ## __args);    \
+                goto close;                               \
+            }                                             \
+        };
+
+int equal_dword(uint16_t *tab_reg, const uint32_t value) {
+    return ((tab_reg[0] == (value >> 16)) && (tab_reg[1] == (value & 0xFFFF)));
+}
 
 /* client主机 */
 int main (int argc, char* argv[])
@@ -197,11 +201,12 @@ int main (int argc, char* argv[])
     modbus_t *ctx = NULL;       //成功打开设备后返回的结构体指针
     uint8_t *tabBits = NULL;            //bit位的空间
     uint16_t *tabRegisters = NULL;      //寄存器的空间
-    uint16_t *tabRegistersBad = NULL;   //
+
     int nbPoints;               //空间大小
     int ret = -1;               //返回值
     int i = 0;
     uint8_t value = 0;
+    float realFloatValue = 0.0;           //浮点数的实际值
 
     /* 判断Modbus的类型 */
     if (argc > 1) {
@@ -381,7 +386,7 @@ int main (int argc, char* argv[])
 #endif
 
     /** Input Registers **/
-#if 1
+#if 0
     ret = modbus_read_input_registers(ctx, UT_INPUT_REGISTERS_ADDRESS,
                                      UT_INPUT_REGISTERS_NB,
                                      tabRegisters);
@@ -395,6 +400,45 @@ int main (int argc, char* argv[])
     }
 #endif
 
+    /* MASKS */
+#if 0
+    printf("1/1 Write mask: ");
+    ret = modbus_write_register(ctx, UT_REGISTERS_ADDRESS, 0x12);
+    ret = modbus_mask_write_register(ctx, UT_REGISTERS_ADDRESS, 0xF2, 0x25);
+    ASSERT_TRUE(ret != -1, "FAILED (%x == -1)\n", ret);
+    ret = modbus_read_registers(ctx, UT_REGISTERS_ADDRESS, 1, tabRegisters);
+    ASSERT_TRUE(tabRegisters[0] == 0x17,
+                "FAILED (%0X != %0X)\n",
+                tabRegisters[0], 0x17);
+#endif
+
+
+    /** FLOAT **/
+#if 1
+    printf("1/4 Set/get float ABCD: ");
+    modbus_set_float_abcd(UT_REAL, tabRegisters);
+    ASSERT_TRUE(equal_dword(tabRegisters, UT_IREAL_ABCD), "FAILED Set float ABCD");
+    realFloatValue = modbus_get_float_abcd(tabRegisters);
+    ASSERT_TRUE(realFloatValue == UT_REAL, "FAILED (%f != %f)\n", realFloatValue, UT_REAL);
+
+    printf("2/4 Set/get float DCBA: ");
+    modbus_set_float_dcba(UT_REAL, tabRegisters);
+    ASSERT_TRUE(equal_dword(tabRegisters, UT_IREAL_DCBA), "FAILED Set float DCBA");
+    realFloatValue = modbus_get_float_dcba(tabRegisters);
+    ASSERT_TRUE(realFloatValue == UT_REAL, "FAILED (%f != %f)\n", realFloatValue, UT_REAL);
+
+    printf("3/4 Set/get float BADC: ");
+    modbus_set_float_badc(UT_REAL, tabRegisters);
+    ASSERT_TRUE(equal_dword(tabRegisters, UT_IREAL_BADC), "FAILED Set float BADC");
+    realFloatValue = modbus_get_float_badc(tabRegisters);
+    ASSERT_TRUE(realFloatValue == UT_REAL, "FAILED (%f != %f)\n", realFloatValue, UT_REAL);
+
+    printf("4/4 Set/get float CDAB: ");
+    modbus_set_float_cdab(UT_REAL, tabRegisters);
+    ASSERT_TRUE(equal_dword(tabRegisters, UT_IREAL_CDAB), "FAILED Set float CDAB");
+    realFloatValue = modbus_get_float_cdab(tabRegisters);
+    ASSERT_TRUE(realFloatValue == UT_REAL, "FAILED (%f != %f)\n", realFloatValue, UT_REAL);
+#endif
 
 
 close:
@@ -488,3 +532,18 @@ close:
  *
  *								狗头保佑，永无BUG！
  */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
