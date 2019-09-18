@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <modbus.h>
+#include ".\Modbus\modbus.h"
 #ifdef _WIN32
 # include <winsock2.h>
 #else
@@ -21,162 +21,7 @@
 # define MSG_NOSIGNAL 0
 #endif
 
-#include "unit-test.h"
-
-enum {
-    TCP,
-    TCP_PI,
-    RTU
-};
-
-#if 0		//server从机
-
-/* server:从机 */
-int main(int argc, char* argv[])
-{
-    int useBackend = RTU;                       //ModBus使用的类型
-    modbus_t *ctx = NULL;                       //成功打开设备后返回的结构体指针
-    uint8_t *query = NULL;                      //接收到的查询数据
-    modbus_mapping_t *modbusMapping = NULL;     //ModBus的线圈，寄存器分布
-    int socketNum = -1;                         //使用网络连接时，建立连接成功后返回的套接字
-    int ret = -1;                                //返回值
-    int headerLength = 0;                       //接收到数据的头长度
-    uint8_t i = 0;
-
-
-    /* 根据所传的参数决定使用哪种方式 */
-    if (argc > 1) {
-        if (0 == strcmp(argv[1], "tcp")) {
-            useBackend = TCP;
-        } else if (0 == strcmp(argv[1], "tcppi")) {
-            useBackend = TCP_PI;
-        } else if (0 == strcmp(argv[1], "rtu")) {
-            useBackend = RTU;
-        } else {
-            printf("Usage:\n  %s [tcp|tcppi|rtu] - Modbus server for unit testing\n\n", argv[0]);
-            return -1;
-        }
-    } else {
-        /* By default */
-        useBackend = RTU;
-    }
-
-    /* 根据不同的连接打开相应的设备 */
-    if (TCP == useBackend) {
-        ctx = modbus_new_tcp("127.0.0.1", 1502);
-        query = malloc(MODBUS_TCP_MAX_ADU_LENGTH);
-    } else if (TCP_PI == useBackend) {
-        ctx = modbus_new_tcp_pi("::0", "1502");
-        query = malloc(MODBUS_TCP_MAX_ADU_LENGTH);
-    } else {
-        ctx = modbus_new_rtu("/dev/ttymxc1", 115200, 'N', 8, 1);
-        modbus_set_slave(ctx, SERVER_ID);
-        query = malloc(MODBUS_RTU_MAX_ADU_LENGTH);
-    }
-
-    headerLength = modbus_get_header_length(ctx);
-
-    modbus_set_debug(ctx, TRUE);        //设置Debug调试
-
-    /* 创建Modbus的mapping */
-    modbusMapping = modbus_mapping_new_start_address(
-                    UT_BITS_ADDRESS, UT_BITS_NB,
-                    UT_INPUT_BITS_ADDRESS, UT_INPUT_BITS_NB,
-                    UT_REGISTERS_ADDRESS, UT_REGISTERS_NB_MAX,
-                    UT_INPUT_REGISTERS_ADDRESS, UT_INPUT_REGISTERS_NB);
-    if (NULL == modbusMapping) {
-        fprintf(stderr, "Failed to allocate the mapping: %s\n", modbus_strerror(errno));
-        modbus_free(ctx);
-        return -1;
-    }
-
-    /* 给比特位和寄存器赋初始值 */
-    modbus_set_bits_from_bytes(modbusMapping->tab_bits, 0, UT_BITS_NB, UT_BITS_TAB);
-    modbus_set_bits_from_bytes(modbusMapping->tab_input_bits, 0, UT_INPUT_BITS_NB, UT_INPUT_BITS_TAB);
-    for (i = 0; i < UT_REGISTERS_NB; i++) {
-        modbusMapping->tab_registers[i] = UT_REGISTERS_TAB[i];
-    }
-    for (i = 0; i < UT_INPUT_REGISTERS_NB; i++) {
-        modbusMapping->tab_input_registers[i] = UT_INPUT_REGISTERS_TAB[i];
-    }
-
-    /* 建立连接 */
-    if (TCP == useBackend) {
-        socketNum = modbus_tcp_listen(ctx, 1);
-        modbus_tcp_accept(ctx, &socketNum);
-    } else if (TCP_PI == useBackend) {
-        socketNum = modbus_tcp_pi_listen(ctx, 1);
-        modbus_tcp_pi_accept(ctx, &socketNum);
-    } else {
-        ret = modbus_connect(ctx);
-        if (-1 == ret) {
-            fprintf(stderr, "Unable to connect %s\n", modbus_strerror(errno));
-            modbus_free(ctx);
-            return -1;
-        }
-    }
-
-    /* 从机循环等待接收数据，然后对接收到的数据进行相应的处理 */
-    while(1) {
-
-        /* Modbus接收数据 */
-        do {
-            ret = modbus_receive(ctx, query);       //Filtered queries return 0
-        } while(0 == ret);
-
-        /* The connection is not closed on errors which require on reply such as bad CRC in RTU. */
-        if (-1 == ret && EMBBADCRC != errno) {
-            break;
-        }
-
-        /* TODO：对接收到的数据的处理 */
-        if (0x01 == query[headerLength]) {                  //Read Bit
-            printf("Read Bit\r\n");
-        } else if (0x02 == query[headerLength]) {           //Read Input Bit
-            printf("Read Input Bit\r\n");
-        } else if (0x05 == query[headerLength]) {           //Write Bit
-            printf("Write Bit\r\n");
-        } else if (0x0F == query[headerLength]) {           //Write Many Bits
-            printf("Write Many Bits\r\n");
-        } else if (0x03 == query[headerLength]) {           //Read Hold Register
-            printf("Read Hold Register\r\n");
-        } else if (0x04 == query[headerLength]) {           //Read Input Register
-            printf("Read Input Register\r\n");
-        } else if (0x06 == query[headerLength]) {           //Write Hold Register
-            printf("Write Hold Register\r\n");
-        } else if (0x10 == query[headerLength]) {           //Write Many Hold Registers
-            printf("Write Many Hold Registers\r\n");
-        } else {
-            printf("Error\r\n");
-        }
-
-
-        ret = modbus_reply(ctx, query, ret, modbusMapping);
-        if (-1 == ret) {
-            break;
-        }
-
-    }
-
-    printf("Quit the loop: %s\n", modbus_strerror(errno));
-
-    /* 释放所有资源 */
-    if (TCP == useBackend) {
-        if (-1 != socketNum) {
-            close(socketNum);
-        }
-    }
-    modbus_mapping_free(modbusMapping);
-    free(query);
-    modbus_close(ctx);
-    modbus_free(ctx);
-
-    return 0;
-
-}
-
-
-#else 		//client主机
+#include ".\Modbus\unit-test.h"
 
 #define BUG_REPORT(_cond, _format, _args ...) \
     printf("\nLine %d: assertion error for '%s': " _format "\n", __LINE__, # _cond, ## _args);
@@ -190,9 +35,19 @@ int main(int argc, char* argv[])
             }                                             \
         };
 
+
+enum {
+    TCP,
+    TCP_PI,
+    RTU
+};
+
+
 int equal_dword(uint16_t *tab_reg, const uint32_t value) {
     return ((tab_reg[0] == (value >> 16)) && (tab_reg[1] == (value & 0xFFFF)));
 }
+
+
 
 /* client主机 */
 int main (int argc, char* argv[])
@@ -267,7 +122,7 @@ int main (int argc, char* argv[])
 
     /** Coil Bits **/
     /* Single Bit */
-#if 0
+#if 1
     ret = modbus_write_bit(ctx, UT_BITS_ADDRESS, ON);
     printf("1/2 modbus_write_bit: ");
     ASSERT_TRUE(ret == 1, "");
@@ -414,7 +269,7 @@ int main (int argc, char* argv[])
 
 
     /** FLOAT **/
-#if 1
+#if 0
     printf("1/4 Set/get float ABCD: ");
     modbus_set_float_abcd(UT_REAL, tabRegisters);
     ASSERT_TRUE(equal_dword(tabRegisters, UT_IREAL_ABCD), "FAILED Set float ABCD");
@@ -454,7 +309,6 @@ close:
 }
 
 
-#endif
 
 
 

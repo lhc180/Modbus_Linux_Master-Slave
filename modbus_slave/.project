@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>Modbus_Master</name>
+	<name>modbus_slave</name>
 	<comment></comment>
 	<projects>
 	</projects>
